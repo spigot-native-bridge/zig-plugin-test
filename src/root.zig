@@ -9,23 +9,27 @@ const BridgeError = bridge.BridgeError;
 
 const Message = chat.Message;
 
-// functions called by mappings/native_plugin.BridgeNativePluginExport
 pub export fn load(state: *plugin.PluginState) void {
+    // by default, bridge-zig can only see the load() function, so we have to pass our
+    // enable and disable functions to the PluginState so they can be called whenever required.
+    state.markPlugin(enable, disable);
+}
+
+pub fn enable(state: *plugin.PluginState) BridgeError!void {
+    // commandRegistry is not yet available in onLoad
+    try state.commandRegistry.registerCommand(.{ .name = "meow", .callback = meowCommand });
+
     // 'listenFallible' for an event listener that can return an error (specifically, BridgeError, meaning, BridgeError!void)
     // 'listen' for an event listener that simply returns 'void'
-    state.eventRegistry.listenFallible(events.blocks.BlockBreakEvent, handleBlockBreakEvent) catch unreachable;
-    state.eventRegistry.listenFallible(events.player.PlayerJoinEvent, onPlayerJoin) catch unreachable;
+
+    try state.eventRegistry.listenFallible(events.blocks.BlockBreakEvent, handleBlockBreakEvent);
+    try state.eventRegistry.listenFallible(events.player.PlayerJoinEvent, onPlayerJoin);
 
     // default is events.debugErrorCallback
     state.eventRegistry.setErrorCallback(events.unreachableErrorCallback);
 }
 
-pub export fn enable(state: *plugin.PluginState) void {
-    // commandRegistry is not yet available in onLoad
-    state.commandRegistry.registerCommand(.{ .name = "meow", .callback = meowCommand }) catch unreachable;
-}
-
-pub export fn disable(_: *plugin.PluginState) void {
+pub fn disable(_: *plugin.PluginState) BridgeError!void {
     std.debug.print("plugin has disabled... - zig", .{});
 }
 
