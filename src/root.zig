@@ -36,13 +36,15 @@ pub export fn load(state: *plugin.PluginState) void {
 }
 
 pub fn enable(state: *plugin.PluginState) BridgeError!void {
+    // set the plugin signature for commands
+    // this is for the fallback prefix (e.g., /zoop:rank)
+    state.commandRegistry.setPluginSignature("zoop");
+
     // commandRegistry is not yet available in onLoad
-    try state.commandRegistry.registerCommand(.{ .name = "meow", .callback = meowCommand });
-    try state.commandRegistry.registerCommand(.{ .name = "rank", .callback = @import("commands/rank.zig").rankCommand });
+    try state.commandRegistry.registerCommand(@import("commands/rank.zig").RankCommand);
 
     // 'listenFallible' for an event listener that can return an error (specifically, BridgeError, meaning, BridgeError!void)
     // 'listen' for an event listener that simply returns 'void'
-
     try state.eventRegistry.listenFallible(events.blocks.BlockBreakEvent, handleBlockBreakEvent);
     try state.eventRegistry.listenFallible(events.player.PlayerJoinEvent, onPlayerJoin);
     try state.eventRegistry.listenFallible(events.player.PlayerChatEvent, onChatMessage);
@@ -50,8 +52,19 @@ pub fn enable(state: *plugin.PluginState) BridgeError!void {
     // default is events.debugErrorCallback
     state.eventRegistry.setErrorCallback(events.debugErrorCallback);
 
-    try pluginState.rankRegistry.registerRank(.{ .id = "developer", .name = "Developer", .prefix = "[Developer]", .color = .aqua, .modifiers = &.{.italic} });
-    try pluginState.rankRegistry.registerRank(.{ .id = "owner", .name = "Owner", .prefix = "[Owner]", .color = .dark_red });
+    try pluginState.rankRegistry.registerRank(.{
+        .id = "developer",
+        .name = "Developer",
+        .prefix = try chat.translateColor("&", "&7[&bDeveloper&7]&b"),
+        .color = .aqua,
+        .modifiers = &.{.italic},
+    });
+    try pluginState.rankRegistry.registerRank(.{
+        .id = "owner",
+        .name = "Owner",
+        .prefix = try chat.translateColor("&", "&7[&4Owner&7]&4"),
+        .color = .dark_red,
+    });
 }
 
 pub fn disable(_: *plugin.PluginState) BridgeError!void {
@@ -88,14 +101,10 @@ pub fn onChatMessage(event: *events.player.PlayerChatEvent) BridgeError!void {
     const prefix = rank.prefix;
 
     try event.setFormat(
-        try std.fmt.allocPrint(plugin.state.allocator, "{s}%1$s: %2$s", .{prefix}),
+        try chat.translateColor("&", try std.fmt.allocPrint(plugin.state.allocator, "{s}%1$s&f: %2$s", .{prefix})),
     );
 }
 
 pub fn handleBlockBreakEvent(event: *events.blocks.BlockBreakEvent) BridgeError!void {
     event.setCancelled(true);
-}
-
-pub fn meowCommand(player: bridge.types.player.Player, _: []const u8, _: []const u8) !void {
-    try player.sendMessage("meowww owo");
 }
