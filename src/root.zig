@@ -3,15 +3,23 @@ const bridge = @import("zig-bridge");
 const _rank = @import("rank.zig");
 const _profile = @import("profile.zig");
 
-pub const pluginState = struct {
-    pub var profileRegistry: ProfileRegistry = undefined;
-    pub var rankRegistry: RankRegistry = undefined;
+pub const PluginState = struct {
+    const Self = @This();
 
-    pub fn init(state: *plugin.PluginState) !void {
-        profileRegistry = ProfileRegistry.init(state.allocator);
-        rankRegistry = RankRegistry.init(state.allocator);
+    profileRegistry: ProfileRegistry,
+    rankRegistry: RankRegistry,
+    allocator: std.mem.Allocator,
+
+    pub fn init(state: *plugin.PluginState) !Self {
+        return .{
+            .profileRegistry = ProfileRegistry.init(state.allocator),
+            .rankRegistry = RankRegistry.init(state.allocator),
+            .allocator = state.allocator,
+        };
     }
 };
+
+pub var pluginState: PluginState = undefined;
 
 const ProfileRegistry = _profile.ProfileRegistry;
 const Profile = _profile.Profile;
@@ -32,7 +40,7 @@ pub export fn load(state: *plugin.PluginState) void {
     // enable and disable functions to the PluginState so they can be called whenever required.
     state.markPlugin(enable, disable);
 
-    pluginState.init(state) catch unreachable;
+    pluginState = PluginState.init(state) catch unreachable;
 }
 
 pub fn enable(state: *plugin.PluginState) BridgeError!void {
@@ -52,23 +60,11 @@ pub fn enable(state: *plugin.PluginState) BridgeError!void {
     // default is events.debugErrorCallback
     state.eventRegistry.setErrorCallback(events.debugErrorCallback);
 
-    try pluginState.rankRegistry.registerRank(.{
-        .id = "developer",
-        .name = "Developer",
-        .prefix = try chat.translateColor("&", "&7[&bDeveloper&7]&b"),
-        .color = .aqua,
-        .modifiers = &.{.italic},
-    });
-    try pluginState.rankRegistry.registerRank(.{
-        .id = "owner",
-        .name = "Owner",
-        .prefix = try chat.translateColor("&", "&7[&4Owner&7]&4"),
-        .color = .dark_red,
-    });
+    try pluginState.rankRegistry.loadRanks();
 }
 
 pub fn disable(_: *plugin.PluginState) BridgeError!void {
-    std.debug.print("plugin has disabled... - zig", .{});
+    try pluginState.rankRegistry.saveRanks();
 }
 
 pub fn onPlayerJoin(event: *events.player.PlayerJoinEvent) BridgeError!void {

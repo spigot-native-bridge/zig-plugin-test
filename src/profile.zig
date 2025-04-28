@@ -15,7 +15,7 @@ pub const Profile = struct {
     id: UniqueId,
     parentRank: RankId,
 
-    pub fn getRank(self: *const Self, registry: rank.RankRegistry) ?rank.Rank {
+    pub fn getRank(self: *const Self, registry: rank.RankRegistry) ?*rank.Rank {
         return registry.getRank(self.parentRank);
     }
 };
